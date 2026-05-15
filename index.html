@@ -325,6 +325,31 @@
   }
   .reset-btn:hover { background: #2a1010; border-color: var(--marvel-red); color: #ff8888; }
 
+  .auth-btn {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--card-border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .auth-btn:hover { border-color: var(--disney-blue); color: var(--text); }
+  .auth-btn.signed-in { color: #7fc3ff; border-color: #3a5a8a; }
+  .auth-avatar {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #2a2a4a;
+  }
+  .sync-status {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-left: 6px;
+  }
+
   @media (max-width: 600px) {
     h1 { font-size: 1.3rem; }
     .movie-grid { grid-template-columns: 1fr 1fr; }
@@ -339,7 +364,11 @@
 <header>
   <div class="header-top">
     <h1>✨ Disney 宇宙片單</h1>
-    <div class="total-progress">已看 <span id="watched-count">0</span> / <span id="total-count">0</span></div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div class="total-progress">已看 <span id="watched-count">0</span> / <span id="total-count">0</span></div>
+      <button class="auth-btn" id="auth-btn" hidden>登入</button>
+      <span class="sync-status" id="sync-status"></span>
+    </div>
   </div>
   <div class="progress-bar-wrap">
     <div class="progress-bar-fill" id="total-bar" style="width:0%"></div>
@@ -365,14 +394,36 @@
 <main id="main"></main>
 
 <script src="data.js"></script>
-<script>
+<script src="firebase-config.js"></script>
+<script type="module">
 // DATA is loaded from data.js as window.DATA
+// Firebase config (optional) is loaded as window.firebaseConfig
 
 const STORAGE_KEY = "disney_checklist_v1";
 
 let state = {};
 let currentCat = "all";
 let searchQuery = "";
+
+// ── Sync layer ───────────────────────────────────────────────────────────
+// localStorage is always the source of truth on this device. Firebase, when
+// configured and signed-in, mirrors state to a per-user Firestore doc so the
+// same Google account shows the same checklist on every device.
+
+const sync = {
+  enabled: false,         // becomes true once Firebase initializes
+  user: null,             // null = not signed in
+  unsubSnap: null,        // Firestore subscription to release on sign-out
+  applyingRemote: false,  // suppress write-back when applying a remote update
+  writeTimer: null,
+  auth: null, db: null, GoogleAuthProvider: null,
+  signInWithPopup: null, signOut: null, doc: null, setDoc: null, onSnapshot: null,
+};
+
+function setSyncStatus(msg, cls = "") {
+  const el = document.getElementById("sync-status");
+  if (el) { el.textContent = msg; el.className = "sync-status " + cls; }
+}
 
 function loadState() {
   try {
@@ -383,6 +434,132 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  scheduleRemoteWrite();
+}
+
+function scheduleRemoteWrite() {
+  if (!sync.enabled || !sync.user || sync.applyingRemote) return;
+  clearTimeout(sync.writeTimer);
+  sync.writeTimer = setTimeout(async () => {
+    try {
+      await sync.setDoc(
+        sync.doc(sync.db, "lists", sync.user.uid),
+        { state, updatedAt: Date.now() },
+        { merge: false }
+      );
+      setSyncStatus("已同步", "");
+    } catch (e) {
+      console.error("Firestore write failed:", e);
+      setSyncStatus("同步失敗", "");
+    }
+  }, 400);
+}
+
+async function initFirebase() {
+  const cfg = window.firebaseConfig;
+  if (!cfg || !cfg.apiKey) return;
+  try {
+    const appMod  = await import("https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js");
+    const authMod = await import("https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js");
+    const fsMod   = await import("https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js");
+
+    const app  = appMod.initializeApp(cfg);
+    sync.auth = authMod.getAuth(app);
+    sync.db   = fsMod.getFirestore(app);
+    sync.GoogleAuthProvider = authMod.GoogleAuthProvider;
+    sync.signInWithPopup    = authMod.signInWithPopup;
+    sync.signOut            = authMod.signOut;
+    sync.doc                = fsMod.doc;
+    sync.setDoc             = fsMod.setDoc;
+    sync.onSnapshot         = fsMod.onSnapshot;
+    sync.enabled = true;
+
+    document.getElementById("auth-btn").hidden = false;
+    authMod.onAuthStateChanged(sync.auth, handleAuthChange);
+  } catch (e) {
+    console.error("Firebase init failed:", e);
+    setSyncStatus("Firebase 載入失敗");
+  }
+}
+
+function handleAuthChange(user) {
+  // Tear down any previous Firestore listener before switching user.
+  if (sync.unsubSnap) { sync.unsubSnap(); sync.unsubSnap = null; }
+  sync.user = user;
+  renderAuthButton();
+
+  if (!user) { setSyncStatus(""); return; }
+
+  setSyncStatus("同步中…");
+  const ref = sync.doc(sync.db, "lists", user.uid);
+  let firstSnapshot = true;
+  sync.unsubSnap = sync.onSnapshot(ref, async (snap) => {
+    if (firstSnapshot) {
+      firstSnapshot = false;
+      const remote = snap.exists() ? (snap.data().state || {}) : null;
+      if (!remote) {
+        // First sign-in: push whatever this device has up to the cloud.
+        await sync.setDoc(ref, { state, updatedAt: Date.now() });
+      } else {
+        // Take the union so neither device loses checks.
+        const merged = { ...remote };
+        for (const k of Object.keys(state)) if (state[k]) merged[k] = true;
+        const changed = JSON.stringify(merged) !== JSON.stringify(remote);
+        sync.applyingRemote = true;
+        state = merged;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        updateAll();
+        sync.applyingRemote = false;
+        if (changed) await sync.setDoc(ref, { state: merged, updatedAt: Date.now() });
+      }
+      setSyncStatus("已同步");
+      return;
+    }
+    // Subsequent snapshots = updates from another device.
+    const remote = snap.exists() ? (snap.data().state || {}) : {};
+    sync.applyingRemote = true;
+    state = remote;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    updateAll();
+    sync.applyingRemote = false;
+    setSyncStatus("已同步");
+  }, (err) => {
+    console.error("Firestore listen failed:", err);
+    setSyncStatus("同步失敗");
+  });
+}
+
+function renderAuthButton() {
+  const btn = document.getElementById("auth-btn");
+  if (!btn) return;
+  if (sync.user) {
+    const name = sync.user.displayName || sync.user.email || "已登入";
+    const avatar = sync.user.photoURL
+      ? `<img class="auth-avatar" src="${sync.user.photoURL}" alt="">`
+      : `<span class="auth-avatar"></span>`;
+    btn.innerHTML = `${avatar}<span>${name}</span><span style="opacity:.6;">· 登出</span>`;
+    btn.classList.add("signed-in");
+  } else {
+    btn.innerHTML = "🔐 用 Google 登入同步";
+    btn.classList.remove("signed-in");
+  }
+}
+
+async function handleAuthClick() {
+  if (!sync.enabled) return;
+  try {
+    if (sync.user) {
+      await sync.signOut(sync.auth);
+    } else {
+      const provider = new sync.GoogleAuthProvider();
+      await sync.signInWithPopup(sync.auth, provider);
+    }
+  } catch (e) {
+    if (e.code !== "auth/popup-closed-by-user") {
+      console.error("Auth failed:", e);
+      alert("登入失敗:" + e.message);
+    }
+  }
 }
 
 function makeId(section, title) {
@@ -568,6 +745,10 @@ function init() {
       updateAll();
     }
   });
+
+  document.getElementById("auth-btn").addEventListener("click", handleAuthClick);
+
+  initFirebase();
 }
 
 init();
