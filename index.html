@@ -36,7 +36,50 @@
     top: 0;
     z-index: 100;
     backdrop-filter: blur(10px);
+    transition: padding 0.25s ease;
   }
+  header.collapsed { padding-top: 12px; padding-bottom: 12px; }
+  header.collapsed .header-top { margin-bottom: 8px; }
+  header.collapsed .progress-bar-wrap { margin-bottom: 0; }
+  header.collapsed .controls {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .controls {
+    max-height: 120px;
+    opacity: 1;
+    transition: max-height 0.25s ease, opacity 0.2s ease;
+  }
+
+  .header-toggle {
+    position: absolute;
+    bottom: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 44px;
+    height: 22px;
+    border-radius: 0 0 12px 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-top: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99;
+    transition: color 0.15s, background 0.15s;
+  }
+  .header-toggle:hover { color: var(--text); background: #1e1e38; }
+  .header-toggle .chev {
+    display: inline-block;
+    transition: transform 0.25s ease;
+  }
+  header.collapsed .header-toggle .chev { transform: rotate(180deg); }
 
   .header-top {
     display: flex;
@@ -389,6 +432,9 @@
     </div>
     <button class="reset-btn" id="reset-btn">重置</button>
   </div>
+  <button class="header-toggle" id="header-toggle" title="收起/展開搜尋與篩選">
+    <span class="chev">▲</span>
+  </button>
 </header>
 
 <main id="main"></main>
@@ -747,6 +793,11 @@ function init() {
   });
 
   document.getElementById("auth-btn").addEventListener("click", handleAuthClick);
+
+  const headerEl = document.querySelector("header");
+  document.getElementById("header-toggle").addEventListener("click", () => {
+    headerEl.classList.toggle("collapsed");
+  });
 
   initFirebase();
 }
