@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disney 片單 Checklist</title>
+<style>
+  :root {
+    --disney-blue: #006edc;
+    --pixar-orange: #e8720c;
+    --marvel-red: #ec1d24;
+    --starwars-gold: #ffe81f;
+    --bg: #0d0d1a;
+    --card-bg: #16162a;
+    --card-border: #2a2a4a;
+    --text: #e8e8f0;
+    --text-muted: #8888aa;
+    --checked-bg: #1a2a1a;
+    --checked-text: #5a8a5a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  header {
+    background: linear-gradient(135deg, #0a0a1e 0%, #1a1040 50%, #0d0d2e 100%);
+    border-bottom: 1px solid var(--card-border);
+    padding: 24px 20px 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, #a8d8ff, #c8b8ff, #ffb8c8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .total-progress {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .total-progress span {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .progress-bar-wrap {
+    background: #2a2a4a;
+    border-radius: 6px;
+    height: 8px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--disney-blue), #a855f7, var(--marvel-red));
+    border-radius: 6px;
+    transition: width 0.4s ease;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .search-wrap {
+    flex: 1;
+    min-width: 160px;
+    max-width: 280px;
+    position: relative;
+  }
+
+  .search-wrap input {
+    width: 100%;
+    background: #1e1e38;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 7px 12px 7px 32px;
+    color: var(--text);
+    font-size: 0.88rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-wrap input:focus { border-color: var(--disney-blue); }
+  .search-wrap::before {
+    content: "🔍";
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.8rem;
+    pointer-events: none;
+  }
+
+  .filter-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--card-border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .filter-btn:hover { border-color: #5555aa; color: var(--text); }
+
+  .filter-btn.active {
+    color: #fff;
+    border-color: transparent;
+  }
+  .filter-btn[data-cat="all"].active { background: #3a3a6a; color: var(--text); }
+  .filter-btn[data-cat="disney"].active { background: var(--disney-blue); }
+  .filter-btn[data-cat="pixar"].active { background: var(--pixar-orange); }
+  .filter-btn[data-cat="marvel"].active { background: var(--marvel-red); }
+  .filter-btn[data-cat="starwars"].active { background: #5a4a00; color: var(--starwars-gold); border-color: var(--starwars-gold); }
+  .filter-btn[data-cat="series"].active { background: #2a4a3a; color: #7fc99a; border-color: #7fc99a; }
+  .filter-btn[data-cat="liveaction"].active { background: #7a2040; color: #ffb8d8; border-color: #e91e8c; }
+  .filter-btn[data-cat="shorts"].active { background: #1a3a1a; color: #86efac; border-color: #22c55e; }
+
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+  }
+
+  .category-section {
+    margin-bottom: 32px;
+  }
+
+  .category-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .category-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .cat-badge {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  [data-section="disney"] .cat-badge { background: #003f80; color: #7fc3ff; }
+  [data-section="pixar"] .cat-badge { background: #5c2e00; color: #ffb86c; }
+  [data-section="marvel"] .cat-badge { background: #6e0000; color: #ff8888; }
+  [data-section="starwars"] .cat-badge { background: #3a2e00; color: var(--starwars-gold); }
+  [data-section="series_marvel"] .cat-badge,
+  [data-section="series_starwars"] .cat-badge { background: #1a3a2a; color: #7fc99a; }
+  [data-section="liveaction_remake"] .cat-badge,
+  [data-section="liveaction"] .cat-badge { background: #4a0a28; color: #ffb8d8; }
+  [data-section="shorts_disney"] .cat-badge,
+  [data-section="shorts_pixar"] .cat-badge { background: #0a2a1a; color: #86efac; }
+
+  .cat-progress-text {
+    margin-left: auto;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+
+  .collapse-icon {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+  }
+  .collapsed .collapse-icon { transform: rotate(-90deg); }
+
+  .cat-progress-bar {
+    height: 3px;
+    background: #2a2a4a;
+    border-radius: 3px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .cat-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+  }
+  [data-section="disney"] .cat-progress-fill { background: var(--disney-blue); }
+  [data-section="pixar"] .cat-progress-fill { background: var(--pixar-orange); }
+  [data-section="marvel"] .cat-progress-fill { background: var(--marvel-red); }
+  [data-section="starwars"] .cat-progress-fill { background: var(--starwars-gold); }
+  [data-section="series_marvel"] .cat-progress-fill { background: #a855f7; }
+  [data-section="series_starwars"] .cat-progress-fill { background: #7fc99a; }
+  [data-section="liveaction_remake"] .cat-progress-fill { background: #e91e8c; }
+  [data-section="liveaction"] .cat-progress-fill { background: #ff9800; }
+  [data-section="shorts_disney"] .cat-progress-fill { background: #22c55e; }
+  [data-section="shorts_pixar"] .cat-progress-fill { background: #c084fc; }
+
+  .movie-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 8px;
+  }
+
+  .movie-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .movie-item:hover { border-color: #4a4a7a; background: #1e1e36; }
+
+  .movie-item.checked {
+    background: var(--checked-bg);
+    border-color: #2a4a2a;
+  }
+  .movie-item.checked .movie-title { color: var(--checked-text); text-decoration: line-through; opacity: 0.7; }
+  .movie-item.checked .movie-year { color: #3a6a3a; }
+
+  .checkbox {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #4a4a6a;
+    border-radius: 5px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    font-size: 11px;
+  }
+  .movie-item.checked .checkbox {
+    background: #2d6a2d;
+    border-color: #4a9a4a;
+    color: #9adf9a;
+  }
+
+  .movie-info { flex: 1; min-width: 0; }
+
+  .movie-title {
+    font-size: 0.88rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.15s;
+  }
+
+  .movie-year {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+
+  .subsection-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 16px 0 8px;
+    padding-left: 4px;
+    font-weight: 600;
+  }
+  .subsection-label:first-child { margin-top: 0; }
+
+  .hidden { display: none !important; }
+
+  .no-results {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 40px;
+    font-size: 0.95rem;
+  }
+
+  .reset-btn {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid #4a2a2a;
+    background: transparent;
+    color: #aa6666;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .reset-btn:hover { background: #2a1010; border-color: var(--marvel-red); color: #ff8888; }
+
+  @media (max-width: 600px) {
+    h1 { font-size: 1.3rem; }
+    .movie-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 400px) {
+    .movie-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <h1>✨ Disney 宇宙片單</h1>
+    <div class="total-progress">已看 <span id="watched-count">0</span> / <span id="total-count">0</span></div>
+  </div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-fill" id="total-bar" style="width:0%"></div>
+  </div>
+  <div class="controls">
+    <div class="search-wrap">
+      <input type="text" id="search" placeholder="搜尋片名…">
+    </div>
+    <div class="filter-tabs">
+      <button class="filter-btn active" data-cat="all">全部</button>
+      <button class="filter-btn" data-cat="disney">Disney</button>
+      <button class="filter-btn" data-cat="pixar">Pixar</button>
+      <button class="filter-btn" data-cat="marvel">Marvel</button>
+      <button class="filter-btn" data-cat="starwars">Star Wars</button>
+      <button class="filter-btn" data-cat="series">劇集</button>
+      <button class="filter-btn" data-cat="liveaction">真人版</button>
+      <button class="filter-btn" data-cat="shorts">短篇</button>
+    </div>
+    <button class="reset-btn" id="reset-btn">重置</button>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<script src="data.js"></script>
+<script>
+// DATA is loaded from data.js as window.DATA
+
+const STORAGE_KEY = "disney_checklist_v1";
+
+let state = {};
+let currentCat = "all";
+let searchQuery = "";
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    state = saved ? JSON.parse(saved) : {};
+  } catch { state = {}; }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function makeId(section, title) {
+  return `${section}__${title.replace(/\s+/g, "_")}`;
+}
+
+function toggleItem(id) {
+  state[id] = !state[id];
+  saveState();
+  updateAll();
+}
+
+function updateAll() {
+  document.querySelectorAll(".movie-item").forEach(el => {
+    const id = el.dataset.id;
+    if (state[id]) el.classList.add("checked");
+    else el.classList.remove("checked");
+    const cb = el.querySelector(".checkbox");
+    cb.textContent = state[id] ? "✓" : "";
+  });
+
+  let totalItems = 0, totalWatched = 0;
+
+  Object.keys(window.DATA).forEach(sectionKey => {
+    const section = window.DATA[sectionKey];
+    let sectionTotal = 0, sectionWatched = 0;
+    section.subsections.forEach(sub => {
+      sub.items.forEach(item => {
+        const id = makeId(sectionKey, item.title);
+        sectionTotal++;
+        if (state[id]) sectionWatched++;
+      });
+    });
+    totalItems += sectionTotal;
+    totalWatched += sectionWatched;
+
+    const pct = sectionTotal > 0 ? (sectionWatched / sectionTotal * 100) : 0;
+    const fill = document.querySelector(`[data-section="${sectionKey}"] .cat-progress-fill`);
+    const text = document.querySelector(`[data-section="${sectionKey}"] .cat-progress-text`);
+    if (fill) fill.style.width = pct + "%";
+    if (text) text.textContent = `${sectionWatched} / ${sectionTotal}`;
+  });
+
+  document.getElementById("watched-count").textContent = totalWatched;
+  document.getElementById("total-count").textContent = totalItems;
+  document.getElementById("total-bar").style.width = (totalItems > 0 ? totalWatched / totalItems * 100 : 0) + "%";
+}
+
+function applyFilters() {
+  const q = searchQuery.toLowerCase();
+
+  document.querySelectorAll(".category-section").forEach(sec => {
+    const sectionCats = (sec.dataset.cats || sec.dataset.cat).split(",");
+    const catMatch = currentCat === "all" || sectionCats.includes(currentCat);
+    if (!catMatch) { sec.classList.add("hidden"); return; }
+    sec.classList.remove("hidden");
+
+    let anyVisible = false;
+    sec.querySelectorAll(".movie-item").forEach(item => {
+      const titleMatch = !q || item.dataset.title.toLowerCase().includes(q);
+      if (titleMatch) { item.classList.remove("hidden"); anyVisible = true; }
+      else item.classList.add("hidden");
+    });
+
+    sec.querySelectorAll(".subsection-group").forEach(grp => {
+      const anyInGroup = [...grp.querySelectorAll(".movie-item")].some(i => !i.classList.contains("hidden"));
+      grp.style.display = anyInGroup ? "" : "none";
+    });
+
+    sec.style.display = anyVisible ? "" : "none";
+  });
+
+  const allHidden = [...document.querySelectorAll(".category-section")].every(s => s.style.display === "none" || s.classList.contains("hidden"));
+  const noRes = document.getElementById("no-results");
+  if (noRes) noRes.style.display = allHidden ? "" : "none";
+}
+
+function buildUI() {
+  const main = document.getElementById("main");
+  main.innerHTML = "";
+
+  Object.keys(window.DATA).forEach(sectionKey => {
+    const section = window.DATA[sectionKey];
+    const secEl = document.createElement("div");
+    secEl.className = "category-section";
+    secEl.dataset.section = sectionKey;
+    secEl.dataset.cat = section.cat;
+    secEl.dataset.cats = (section.cats || [section.cat]).join(",");
+
+    const header = document.createElement("div");
+    header.className = "category-header";
+    header.innerHTML = `
+      <div class="category-title">
+        <span>${section.icon}</span>
+        <span>${section.label}</span>
+        <span class="cat-badge">${section.cat.toUpperCase()}</span>
+      </div>
+      <span class="cat-progress-text">0 / 0</span>
+      <span class="collapse-icon">▼</span>
+    `;
+
+    const body = document.createElement("div");
+    body.className = "category-body";
+
+    const catProgressBar = document.createElement("div");
+    catProgressBar.className = "cat-progress-bar";
+    catProgressBar.innerHTML = '<div class="cat-progress-fill" style="width:0%"></div>';
+    body.appendChild(catProgressBar);
+
+    section.subsections.forEach(sub => {
+      const grp = document.createElement("div");
+      grp.className = "subsection-group";
+
+      const lbl = document.createElement("div");
+      lbl.className = "subsection-label";
+      lbl.textContent = sub.label;
+      grp.appendChild(lbl);
+
+      const grid = document.createElement("div");
+      grid.className = "movie-grid";
+
+      sub.items.forEach(item => {
+        const id = makeId(sectionKey, item.title);
+        const el = document.createElement("div");
+        el.className = "movie-item";
+        el.dataset.id = id;
+        el.dataset.title = [item.title, item.orig, item.group].filter(Boolean).join(" ");
+        el.innerHTML = `
+          <div class="checkbox"></div>
+          <div class="movie-info">
+            <div class="movie-title">${item.title}</div>
+            <div class="movie-year">${item.year}${item.orig ? ` · ${item.orig}` : ''}</div>
+          </div>
+        `;
+        el.addEventListener("click", () => toggleItem(id));
+        grid.appendChild(el);
+      });
+
+      grp.appendChild(grid);
+      body.appendChild(grp);
+    });
+
+    header.addEventListener("click", () => {
+      secEl.classList.toggle("collapsed");
+      body.style.display = secEl.classList.contains("collapsed") ? "none" : "";
+    });
+
+    secEl.appendChild(header);
+    secEl.appendChild(body);
+    main.appendChild(secEl);
+  });
+
+  const noRes = document.createElement("div");
+  noRes.id = "no-results";
+  noRes.className = "no-results hidden";
+  noRes.textContent = "找不到符合的片名";
+  main.appendChild(noRes);
+}
+
+function init() {
+  loadState();
+  buildUI();
+  updateAll();
+
+  document.querySelectorAll(".filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentCat = btn.dataset.cat;
+      applyFilters();
+    });
+  });
+
+  document.getElementById("search").addEventListener("input", e => {
+    searchQuery = e.target.value;
+    applyFilters();
+  });
+
+  document.getElementById("reset-btn").addEventListener("click", () => {
+    if (confirm("確定要重置所有勾選進度嗎？")) {
+      state = {};
+      saveState();
+      updateAll();
+    }
+  });
+}
+
+init();
+</script>
+</body>
+</html>
