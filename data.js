@@ -400,6 +400,7 @@ window.DATA = {
         label: "1950–1989",
         items: [
           { title: "歡樂滿人間", year: 1964, orig: "Mary Poppins" },
+          { title: "電子世界爭霸戰", year: 1982, orig: "Tron" },
           { title: "春風化雨", year: 1989, orig: "Dead Poets Society" },
         ]
       },
@@ -453,6 +454,7 @@ window.DATA = {
           { title: "魔境夢遊：時光怪客", year: 2016, orig: "Alice Through the Looking Glass" },
           { title: "神鬼奇航5：死無對證", year: 2017, orig: "Pirates of the Caribbean: Dead Men Tell No Tales" },
           { title: "美女與野獸", year: 2017, orig: "Beauty and the Beast" },
+          { title: "愛‧滿人間", year: 2018, orig: "Mary Poppins Returns" },
           { title: "阿拉丁", year: 2019, orig: "Aladdin" },
           { title: "黑魔女2", year: 2019, orig: "Maleficent: Mistress of Evil" },
           { title: "花木蘭", year: 2020, orig: "Mulan" },

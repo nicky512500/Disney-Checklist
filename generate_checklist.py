@@ -291,7 +291,17 @@ live_pool = (raw['disney_pictures_liveaction']
              + raw.get('touchstone_liveaction', [])
              + raw.get('hollywood_pictures', [])
              + disney_anim_pool_live)
-la = dedup_sort(live_pool, min_pop=6, min_year=1950)
+la_main = dedup_sort(live_pool, min_pop=6, min_year=1950)
+
+# Rescue notable classics that sit just under the popularity threshold.
+LA_FORCE_IDS = [
+    97,      # Tron (1982) — pop ~5.3
+    400650,  # Mary Poppins Returns (2018) — pop ~3.5
+]
+la_extra_force = dedup_sort(include_by_id(live_pool, LA_FORCE_IDS))
+la_main_titles = {i['title'].lower() for i in la_main}
+la = la_main + [m for m in la_extra_force if m['title'].lower() not in la_main_titles]
+la.sort(key=lambda x: (x['year'], x['title']))
 liveaction_js = js_section('liveaction', 'Disney 真人電影', '🎭', 'liveaction', [
     {'label': '1950–1989', 'items': yr(la, 1950, 1989)},
     {'label': '1990–2009', 'items': yr(la, 1990, 2009)},
