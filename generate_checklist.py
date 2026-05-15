@@ -281,9 +281,16 @@ sw_tv_js = js_section('series_starwars', 'Star Wars 劇集', '🌌', 'series', [
 # ── Disney live-action (Disney Pictures + Touchstone + Hollywood Pictures) ──
 # Lowered min_pop from 8 → 6 so National Treasure, Pearl Harbor, Enchanted,
 # Prince of Persia, Jungle Cruise etc. no longer get filtered out.
+# Also pull non-animated titles out of the disney_animation pool — that pool
+# is fed by Walt Disney Productions (id 3166), which distributed many classic
+# live-action films like Mary Poppins (1964) and Tron (1982) that get dropped
+# by the is_animated filter in the animation section.
+disney_anim_pool_live = [m for m in raw['disney_animation']
+                         if ANIM_GENRE not in m.get('genre_ids', [])]
 live_pool = (raw['disney_pictures_liveaction']
              + raw.get('touchstone_liveaction', [])
-             + raw.get('hollywood_pictures', []))
+             + raw.get('hollywood_pictures', [])
+             + disney_anim_pool_live)
 la = dedup_sort(live_pool, min_pop=6, min_year=1950)
 liveaction_js = js_section('liveaction', 'Disney 真人電影', '🎭', 'liveaction', [
     {'label': '1950–1989', 'items': yr(la, 1950, 1989)},
